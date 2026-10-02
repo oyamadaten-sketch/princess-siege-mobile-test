@@ -19,7 +19,16 @@ const ui = {
   cameraHint: document.querySelector("#cameraHint"), heroSpeech: document.querySelector("#heroSpeech"),
   slowCaption: document.querySelector("#slowCaption"), resultTitle: document.querySelector("#resultTitle"),
   resultText: document.querySelector("#resultText"), resultEyebrow: document.querySelector("#resultEyebrow"),
+  mobileMovePad: document.querySelector("#mobileMovePad"), mobileMoveRing: document.querySelector("#mobileMoveRing"),
+  mobileMoveKnob: document.querySelector("#mobileMoveKnob"), mobileMoveLabel: document.querySelector("#mobileMoveLabel"),
+  fullscreenButton: document.querySelector("#fullscreenButton"), mobileAimHint: document.querySelector("#mobileAimHint"),
+  portraitNotice: document.querySelector("#portraitNotice"), portraitLandscapeButton: document.querySelector("#portraitLandscapeButton"),
+  portraitContinueButton: document.querySelector("#portraitContinueButton"),
 };
+
+const isTouchDevice = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 || innerWidth <= 900;
+document.documentElement.classList.toggle("touch-device", isTouchDevice);
+if (isTouchDevice) ui.fireButton.querySelector(":scope > span").textContent = "長押しでためる";
 
 // ★追加：カメラ切り替えボタンを自動生成して追加
 const controlsPanel = document.querySelector(".controls");
@@ -229,6 +238,8 @@ let camPitch = 0.55;
 let camDist = 55;
 const camTarget = new THREE.Vector3(10, 6, 7);
 const cameraKeys = new Set();
+const mobileMove = new THREE.Vector2();
+let mobileMovePointerId = null;
 
 function mat(color) { return new THREE.MeshToonMaterial({ color }); }
 
@@ -1101,9 +1112,9 @@ function makeRival() {
 function updateMovement(dt) {
   if (!playing || result || isCameraMode || rescueState.active) return;
   const move = new THREE.Vector3(
-    (moveKeys.has("KeyD") ? 1 : 0) - (moveKeys.has("KeyA") ? 1 : 0),
+    (moveKeys.has("KeyD") ? 1 : 0) - (moveKeys.has("KeyA") ? 1 : 0) + mobileMove.x,
     0,
-    (moveKeys.has("KeyS") ? 1 : 0) - (moveKeys.has("KeyW") ? 1 : 0),
+    (moveKeys.has("KeyS") ? 1 : 0) - (moveKeys.has("KeyW") ? 1 : 0) + mobileMove.y,
   );
   const moving = move.lengthSq() > 0;
 
@@ -2384,6 +2395,7 @@ camBtn.addEventListener("click", (e) => {
   moveKeys.clear(); cameraKeys.clear();
   camBtn.classList.toggle("active", isCameraMode);
   camBtn.innerHTML = isCameraMode ? "<span>MODE</span>↩ 砲台へ" : "<span>MODE</span>🎥 カメラ";
+  if (ui.mobileMoveLabel) ui.mobileMoveLabel.textContent = isCameraMode ? "カメラ移動" : "砲台移動";
   renderer.domElement.classList.toggle("camera-mode", isCameraMode);
   ui.cameraHint?.classList.toggle("visible", isCameraMode);
   trajectory.visible = !isCameraMode && playing && !result && !rescueState.active;
@@ -2394,7 +2406,18 @@ camBtn.addEventListener("click", (e) => {
 
 let dragging = false, dragX = 0, dragY = 0;
 let rightFirePointerId = null;
+const touchPointers = new Map();
+let pinchDistance = 0;
 renderer.domElement.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch") {
+    touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (isCameraMode && touchPointers.size === 2) {
+      const points = [...touchPointers.values()];
+      pinchDistance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+      dragging = false;
+      return;
+    }
+  }
   if (e.button === 2) {
     e.preventDefault();
     if (playing && !result && !isCameraMode && !rescueState.active && !isCharging && ammo > 0 && shotCooldown <= 0) {
@@ -2412,6 +2435,19 @@ renderer.domElement.addEventListener("pointerdown", e => {
 });
 
 addEventListener("pointermove", e => {
+  if (e.pointerType === "touch" && touchPointers.has(e.pointerId)) {
+    touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (isCameraMode && touchPointers.size === 2) {
+      const points = [...touchPointers.values()];
+      const nextDistance = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+      if (pinchDistance > 0 && nextDistance > 0) {
+        camera.zoom = THREE.MathUtils.clamp(camera.zoom * (nextDistance / pinchDistance), .62, 2.15);
+        camera.updateProjectionMatrix();
+      }
+      pinchDistance = nextDistance;
+      return;
+    }
+  }
   if (!dragging || !playing || result) return;
   const dx = e.clientX - dragX, dy = e.clientY - dragY; dragX = e.clientX; dragY = e.clientY;
   
@@ -2425,6 +2461,8 @@ addEventListener("pointermove", e => {
   }
 });
 addEventListener("pointerup", e => {
+  touchPointers.delete(e.pointerId);
+  if (touchPointers.size < 2) pinchDistance = 0;
   dragging = false;
   if (e.button === 2 && e.pointerId === rightFirePointerId) {
     rightFirePointerId = null;
@@ -2436,6 +2474,8 @@ addEventListener("pointerup", e => {
   }
 });
 addEventListener("pointercancel", e => {
+  touchPointers.delete(e.pointerId);
+  if (touchPointers.size < 2) pinchDistance = 0;
   dragging = false;
   if (e.pointerId === rightFirePointerId) {
     rightFirePointerId = null;
@@ -2451,10 +2491,72 @@ renderer.domElement.addEventListener("wheel", e => {
   camera.updateProjectionMatrix();
 }, { passive: false });
 
+function updateMobileMoveFromPointer(event) {
+  if (!ui.mobileMoveRing) return;
+  const bounds = ui.mobileMoveRing.getBoundingClientRect();
+  const radius = Math.max(1, Math.min(bounds.width, bounds.height) * .34);
+  let dx = event.clientX - (bounds.left + bounds.width / 2);
+  let dy = event.clientY - (bounds.top + bounds.height / 2);
+  const distance = Math.hypot(dx, dy);
+  if (distance > radius) { dx *= radius / distance; dy *= radius / distance; }
+  mobileMove.set(dx / radius, dy / radius);
+  if (mobileMove.length() < .12) mobileMove.set(0, 0);
+  ui.mobileMoveKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+
+function resetMobileMove() {
+  mobileMovePointerId = null;
+  mobileMove.set(0, 0);
+  if (ui.mobileMoveKnob) ui.mobileMoveKnob.style.transform = "translate(0, 0)";
+}
+
+ui.mobileMoveRing?.addEventListener("pointerdown", event => {
+  event.preventDefault(); event.stopPropagation();
+  mobileMovePointerId = event.pointerId;
+  ui.mobileMoveRing.setPointerCapture?.(event.pointerId);
+  updateMobileMoveFromPointer(event);
+});
+ui.mobileMoveRing?.addEventListener("pointermove", event => {
+  if (event.pointerId !== mobileMovePointerId) return;
+  event.preventDefault(); event.stopPropagation();
+  updateMobileMoveFromPointer(event);
+});
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+  ui.mobileMoveRing?.addEventListener(type, event => {
+    if (event.pointerId !== mobileMovePointerId) return;
+    event.preventDefault(); event.stopPropagation(); resetMobileMove();
+  });
+}
+
+async function enterMobileFullscreen() {
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI: "hide" });
+  } catch (error) { console.info("Fullscreen is unavailable in this browser.", error); }
+  try { await screen.orientation?.lock?.("landscape"); } catch {}
+}
+
+ui.fullscreenButton?.addEventListener("click", event => { event.stopPropagation(); enterMobileFullscreen(); });
+ui.portraitLandscapeButton?.addEventListener("click", event => {
+  event.stopPropagation();
+  document.documentElement.classList.add("portrait-allowed");
+  enterMobileFullscreen();
+});
+ui.portraitContinueButton?.addEventListener("click", event => {
+  event.stopPropagation();
+  document.documentElement.classList.add("portrait-allowed");
+  try { sessionStorage.setItem("pixelSiegePortraitAllowed", "1"); } catch {}
+});
+try {
+  if (sessionStorage.getItem("pixelSiegePortraitAllowed") === "1") document.documentElement.classList.add("portrait-allowed");
+} catch {}
+document.addEventListener("fullscreenchange", () => {
+  ui.fullscreenButton?.classList.toggle("active", Boolean(document.fullscreenElement));
+});
+
 function updateCameraNavigation(dt) {
   if (!isCameraMode || !playing || result) return;
-  const forward = ((cameraKeys.has("KeyW") ? 1 : 0) - (cameraKeys.has("KeyS") ? 1 : 0));
-  const side = ((cameraKeys.has("KeyD") ? 1 : 0) - (cameraKeys.has("KeyA") ? 1 : 0));
+  const forward = ((cameraKeys.has("KeyW") ? 1 : 0) - (cameraKeys.has("KeyS") ? 1 : 0)) - mobileMove.y;
+  const side = ((cameraKeys.has("KeyD") ? 1 : 0) - (cameraKeys.has("KeyA") ? 1 : 0)) + mobileMove.x;
   const rise = ((cameraKeys.has("KeyE") ? 1 : 0) - (cameraKeys.has("KeyQ") ? 1 : 0));
   const speed = 17 * dt / camera.zoom;
   camTarget.x += (-Math.sin(camYaw) * forward + Math.cos(camYaw) * side) * speed;
@@ -2627,6 +2729,9 @@ function beginGame(event) {
   trajectory.visible = true;
   updateAmmo();
   try { initAudio(); } catch (error) { console.warn("Audio unavailable; continuing without sound.", error); }
+  if (isTouchDevice) {
+    setTimeout(() => document.documentElement.classList.add("mobile-mission-compact"), 3600);
+  }
 }
 
 // Some browser/trackpad combinations have dropped the synthetic click after a

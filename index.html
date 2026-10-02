@@ -8,7 +8,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>PIXEL SIEGE - 姫を救え！</title>
-    <link rel="stylesheet" href="./style.css?v=61" />
+    <link rel="stylesheet" href="./style.css?v=62" />
   </head>
   <body>
     <main id="game" aria-label="ゲーム画面"></main>
@@ -46,6 +46,25 @@
           発射！
           <i class="power-track" aria-hidden="true"><i id="powerBar"></i></i>
         </button>
+      </div>
+
+      <div id="mobileMovePad" class="mobile-move-pad" aria-label="砲台移動">
+        <div id="mobileMoveRing" class="mobile-move-ring" role="button" aria-label="移動スティック" tabindex="0">
+          <i id="mobileMoveKnob" aria-hidden="true"></i>
+        </div>
+        <span id="mobileMoveLabel">砲台移動</span>
+      </div>
+      <button id="fullscreenButton" class="fullscreen-button" type="button" aria-label="全画面表示">⛶</button>
+      <div id="mobileAimHint" class="mobile-aim-hint">画面をドラッグしてねらう</div>
+    </section>
+
+    <section id="portraitNotice" class="portrait-notice" aria-label="画面向きの案内">
+      <div class="portrait-card">
+        <div class="rotate-phone" aria-hidden="true">↻ 📱</div>
+        <b>横画面がおすすめです</b>
+        <p>お城と砲台を広く見渡せる横画面で遊べます。</p>
+        <button id="portraitLandscapeButton" type="button">横画面・全画面で遊ぶ</button>
+        <button id="portraitContinueButton" class="portrait-secondary" type="button">このまま遊ぶ</button>
       </div>
     </section>
 
@@ -125,6 +144,6 @@
       document.addEventListener("pointerup", requestPixelSiegeStart, true);
       document.addEventListener("click", requestPixelSiegeStart, true);
     </script>
-    <script type="module" src="./main.js?v=61"></script>
+    <script type="module" src="./main.js?v=62"></script>
   </body>
 </html>
