@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#201a2d" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>PIXEL SIEGE - 姫を救え！</title>
+    <link rel="stylesheet" href="./style.css?v=61" />
+  </head>
+  <body>
+    <main id="game" aria-label="ゲーム画面"></main>
+
+    <section id="hud">
+      <aside id="princessCam" class="princess-cam panel" aria-label="姫カメラ">
+        <div class="princess-cam-head"><b>PRINCESS CAM</b><span id="princessCamState">安全</span></div>
+        <div id="princessCamViewport" class="princess-cam-viewport"></div>
+      </aside>
+
+      <div class="mission panel">
+        <span id="missionLabel">第一章</span>
+        <b id="missionText">砦に閉じ込められた姫を助け出せ！</b>
+      </div>
+
+      <div class="ammo panel">
+        <span>砲弾</span>
+        <div id="ammoPips" aria-label="残弾数"></div>
+      </div>
+
+      <!-- ★追加：姫の体力ゲージ -->
+      <div class="hp panel">
+        <span>姫の体力</span>
+        <div id="hpPips" aria-label="体力"></div>
+      </div>
+
+      <div id="cameraHint" class="camera-hint">
+        <b>見回しカメラ</b><span>ドラッグ：向きを変える　WASD：移動　ホイール：ズーム</span>
+      </div>
+
+      <div class="controls panel">
+        <span>WASD：砲台を押す　／　ドラッグ・矢印：ねらう　／　右クリック：ためて撃つ</span>
+        <button id="fireButton" type="button">
+          <span>SPACE / 右クリック</span>
+          発射！
+          <i class="power-track" aria-hidden="true"><i id="powerBar"></i></i>
+        </button>
+      </div>
+    </section>
+
+    <section id="introSequence" class="intro-sequence visible" aria-label="オープニング">
+      <div class="intro-moon"></div>
+      <div class="intro-cloud cloud-a"></div>
+      <div class="intro-cloud cloud-b"></div>
+      <div class="intro-hills"></div>
+      <div class="intro-meadow"></div>
+      <div class="intro-tree tree-a"></div>
+      <div class="intro-tree tree-b"></div>
+      <div class="intro-blanket"></div>
+
+      <div class="intro-person intro-hero" aria-hidden="true">
+        <i class="pixel-head"></i><i class="pixel-hair"></i><i class="pixel-body"></i><i class="pixel-leg left"></i><i class="pixel-leg right"></i>
+      </div>
+      <div class="intro-person intro-princess" aria-hidden="true">
+        <i class="pixel-crown"></i><i class="pixel-head"></i><i class="pixel-hair"></i><i class="pixel-body"></i>
+      </div>
+      <div class="intro-rival" aria-hidden="true">
+        <i class="rival-wing left"></i><i class="rival-wing right"></i><i class="pixel-head"></i><i class="pixel-body"></i>
+      </div>
+      <div class="intro-heart">♥</div>
+      <div class="intro-shock hero-shock">!</div><div class="intro-shock princess-shock">!</div>
+
+      <div class="intro-copy">
+        <p class="eyebrow">PIXEL SIEGE — PROLOGUE</p>
+        <h2 id="introCaption">ある日の、穏やかな夕暮れ。</h2>
+      </div>
+      <button id="skipIntro" type="button">SKIP ▶</button>
+    </section>
+
+    <section id="startOverlay" class="overlay" aria-hidden="true">
+      <div class="card">
+        <p id="startEyebrow" class="eyebrow">第一章</p>
+        <h1 id="startTitle">はじまりの砦</h1>
+        <div id="startStory" class="story">
+          黒い翼の男を追って、古びた砦へ。<br />姫は石壁の向こうに閉じ込められている。<br />急がないと、また連れ去られてしまう。
+          <small>砲台を押して、姫のもとへ道を開こう</small>
+        </div>
+        <a id="startButton" class="start-link" href="./?stage=1&amp;play=1">城へ挑む</a>
+      </div>
+    </section>
+
+    <section id="resultOverlay" class="overlay">
+      <div class="card result-card">
+        <p id="resultEyebrow" class="eyebrow">GAME OVER</p>
+        <h1 id="resultTitle">救出失敗…</h1>
+        <p id="resultText"></p>
+        <div class="result-actions">
+          <button id="retryButton" type="button">もう一度挑む</button>
+          <button id="stageOneButton" class="secondary" type="button" hidden>最初の砦へ</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="stageTransition" class="stage-transition" aria-hidden="true"></div>
+
+    <!-- ★追加：姫の怒りの吹き出し -->
+    <div id="princessSpeech" class="speech-bubble"></div>
+    <div id="heroSpeech" class="hero-speech">やったー！</div>
+    
+    <div id="slowCaption">OH NOOOOO...!</div>
+    <div id="loading" class="visible">ゲームを準備中…</div>
+
+    <script>
+      window.__pixelSiegeStartRequested = false;
+      const requestPixelSiegeStart = (event) => {
+        const button = event.target.closest?.("#startButton");
+        if (!button) return;
+        window.__pixelSiegeStartRequested = true;
+        const overlay = document.querySelector("#startOverlay");
+        overlay?.classList.remove("visible");
+        overlay?.setAttribute("aria-hidden", "true");
+        window.dispatchEvent(new CustomEvent("pixel-siege-start"));
+      };
+      document.addEventListener("pointerup", requestPixelSiegeStart, true);
+      document.addEventListener("click", requestPixelSiegeStart, true);
+    </script>
+    <script type="module" src="./main.js?v=61"></script>
+  </body>
+</html>
